@@ -70,10 +70,59 @@ def validate_dataframe(df, name):
     return df
 
 
+def load_lending_club(filepath="data/raw/accepted_2007_to_2018Q4.csv", nrows=500000):
+    """
+    Loads Lending Club loan data.
+    Uses nrows to limit memory usage during development.
+    """
+    print(f"Loading Lending Club data ({nrows:,} rows)...")
+
+    usecols = [
+        "loan_amnt", "term", "int_rate", "installment", "grade",
+        "sub_grade", "emp_length", "home_ownership", "annual_inc",
+        "verification_status", "issue_d", "loan_status", "purpose",
+        "dti", "delinq_2yrs", "fico_range_low", "fico_range_high",
+        "open_acc", "pub_rec", "revol_bal", "revol_util", "total_acc",
+        "mort_acc", "pub_rec_bankruptcies"
+    ]
+
+    df = pd.read_csv(filepath, usecols=usecols, nrows=nrows, low_memory=False)
+    print(f"Loaded: {df.shape[0]:,} rows, {df.shape[1]} columns")
+    return df
+
+
+def create_target_variable(df):
+    """
+    Creates binary target variable from loan_status.
+    1 = default, 0 = fully paid.
+    Drops rows with ambiguous loan status.
+    """
+    keep_status = ["Fully Paid", "Charged Off", "Default"]
+    df = df[df["loan_status"].isin(keep_status)].copy()
+
+    df["default"] = (df["loan_status"].isin(["Charged Off", "Default"])).astype(int)
+    df = df.drop(columns=["loan_status"])
+
+    default_rate = df["default"].mean() * 100
+    print(f"Target created — Default rate: {default_rate:.1f}%")
+    print(f"Rows after filtering: {df.shape[0]:,}")
+    return df
+
+
+
+
+
 if __name__ == "__main__":
+    # FRED macro indicators
     macro = fetch_macro_indicators()
     validate_dataframe(macro, "macro_indicators")
-
     os.makedirs("data/processed", exist_ok=True)
     macro.to_csv("data/processed/macro_indicators.csv")
-    print("\nSaved to data/processed/macro_indicators.csv")
+    print("Saved to data/processed/macro_indicators.csv")
+
+    # Lending Club loans
+    loans = load_lending_club()
+    loans = create_target_variable(loans)
+    validate_dataframe(loans, "lending_club")
+    loans.to_csv("data/processed/loans_clean.csv", index=False)
+    print("Saved to data/processed/loans_clean.csv") 
