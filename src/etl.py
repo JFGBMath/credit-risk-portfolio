@@ -18,8 +18,8 @@ def get_fred_client():
 def fetch_macro_indicators(start_date="2007-01-01", end_date="2024-12-31"):
     """
     Downloads macroeconomic indicators from FRED.
+    SP500 is fetched separately via yfinance for better historical coverage.
     Returns a DataFrame indexed by date.
-    Includes retry logic for temporary server errors.
     """
     fred = get_fred_client()
 
@@ -28,7 +28,6 @@ def fetch_macro_indicators(start_date="2007-01-01", end_date="2024-12-31"):
         "unemployment_rate": "UNRATE",
         "cpi_inflation": "CPIAUCSL",
         "gdp_growth": "A191RL1Q225SBEA",
-        "sp500": "SP500",
     }
 
     print("Downloading macroeconomic indicators from FRED...")
@@ -48,11 +47,18 @@ def fetch_macro_indicators(start_date="2007-01-01", end_date="2024-12-31"):
                     print(f"     Failed after 3 attempts: {e}")
                     raise
 
+    print("  -> sp500 (yfinance)")
+    import yfinance as yf
+    sp500 = yf.download("^GSPC", start=start_date, end=end_date, progress=False)
+    sp500_monthly = sp500["Close"].squeeze().resample("MS").last()
+    frames["sp500"] = sp500_monthly
+
     macro_df = pd.DataFrame(frames)
     macro_df.index.name = "date"
     macro_df = macro_df.resample("MS").last()
     macro_df = macro_df.ffill()
-    macro_df = macro_df.dropna(subset=["sp500"])
+    macro_df = macro_df.bfill()
+    macro_df = macro_df.dropna()
 
     print(f"Macro data: {macro_df.shape[0]} rows, {macro_df.shape[1]} columns")
     return macro_df
