@@ -62,9 +62,13 @@ def impute_nulls(df):
 def create_financial_ratios(df):
     """
     Creates new features based on financial domain knowledge.
+    Clips extreme values to avoid inf from zero division.
     """
-    df["installment_to_income"] = df["installment"] / (df["annual_inc"] / 12)
-    df["loan_to_income"] = df["loan_amnt"] / df["annual_inc"]
+    annual_inc_safe = df["annual_inc"].replace(0, np.nan)
+    df["installment_to_income"] = df["installment"] / (annual_inc_safe / 12)
+    df["loan_to_income"] = df["loan_amnt"] / annual_inc_safe
+    df["installment_to_income"] = df["installment_to_income"].fillna(df["installment_to_income"].median())
+    df["loan_to_income"] = df["loan_to_income"].fillna(df["loan_to_income"].median())
     df["fico_score"] = (df["fico_range_low"] + df["fico_range_high"]) / 2
     df = df.drop(columns=["fico_range_low", "fico_range_high"])
     return df
